@@ -32,7 +32,7 @@ def login(num,pwd,domain_cookie):
     password.send_keys(pwd)    #输入密码
     login = driver.find_element(by=By.XPATH, value='//*[@id="app"]/div[1]/div[5]/div/div[1]/form/div[3]/div/button')
     login.click()   #点击登录按钮
-
+    time.sleep(1)
     #为预约座位调用api获取信息
     userinfo = driver.execute_script('return sessionStorage.getItem("userInfo");')#观察可知token存储位置
     userinfo=userinfo.split(',')
@@ -46,6 +46,28 @@ def login(num,pwd,domain_cookie):
     #明天试试能否不用domain呢？
     return token,cookies
 #webdriver不会自动结束，故还可以继续使用token和cookie，且由于使用文件存储需要手动更新，应该不会过时。
+
+def available(token,cookies):
+    available_api='http://libseat.cupl.edu.cn/ic-web/device/tips'
+    header = {
+    "User-Agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36',
+    'Connection': 'keep-alive',
+    'Origin': 'http://libseat.cupl.edu.cn',
+    'Referer': 'http://libseat.cupl.edu.cn/',
+    'token':str(token),
+    'Cookie':cookies
+    }
+    res_param={
+        'devId':100455435,
+        'classKind':8,
+        'resvRuleId':1,
+        'chooseBeginTime':'2022-11-16+10:25:00',
+        'isConsole':'false'
+    }
+    res = requests.get(url=available_api, headers=header, params=res_param)
+    tmp = json.loads(res.content)
+    return tmp
+
 def reserve(token,cookies,ide,seat,tor_date):
     '''
     domain_cookie=domain_cookie.split(';')
@@ -96,6 +118,7 @@ def reserve(token,cookies,ide,seat,tor_date):
 def main():
     cur_time = time.strftime("%H:%M:%S", time.localtime())
     print(cur_time)
+    '''
     flag = True
     while cur_time < '21:39:00':
         if flag is True:
@@ -105,22 +128,23 @@ def main():
     cur_date = datetime.date.today()
     tor_date = cur_date + datetime.timedelta(days=1)
     tor_date = str(tor_date)
-
+    '''
     #从文件中获取身份信息
     person=pd.read_csv('D:\\01 学习资料\\00 研究\\04 计算机\\01 工作储备\\02 语言\\02 python\\03 爬虫\\00 项目\\01 图书馆抢座位\identity.csv')
-    seats=pd.read_csv('D:\\01 学习资料\\00 研究\\04 计算机\\01 工作储备\\02 语言\\02 python\\03 爬虫\\00 项目\\01 图书馆抢座位\seats.csv')
+    seats=pd.read_csv('D:\\01 学习资料\\00 研究\\04 计算机\\01 工作储备\\02 语言\\02 python\\03 爬虫\\00 项目\\01 图书馆抢座位\seat.csv')
     for i in range(person.shape[0]):
-        num=person.iloc[i][0]
-        pwd=person.iloc[i][1]
+        num=int(person.iloc[i][0])
+        pwd=int(person.iloc[i][1])
         domain_cookie=person.iloc[i][3]
         #如果要抢座位，做好还是能同时操作多人，如何实现多线程
         token,cookies=login(num,pwd,domain_cookie)
         print(token,cookies)
+        print(available(token,cookies))
         #获取座位信息，之所以不选择迭代是因为座位有区分，靠近窗口等，故不做尝试。
         ide=person.iloc[i][2]
         for i in range(seats.shape[0]):
             seat=seats.iloc[i][1]
-            tmp=reserve(token,cookies,ide,seat,tor_date)
+            tmp=reserve(token,cookies,ide,seat)
             #此处是对异常处理，如果是未到约定时间，继续申请该值，如果是已被占用或其他非法，申请下一个
             if tmp=='':
                 print(1)
